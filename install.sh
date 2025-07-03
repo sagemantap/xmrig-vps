@@ -32,7 +32,7 @@ cat > config.json <<EOF
   "pools": [{
     "url": "$POOL",
     "user": "$WALLET.$WORKER",
-    "pass": "x",
+    "pass": "Pedro",
     "keepalive": true,
     "tls": true
   }]
